@@ -1,0 +1,29 @@
+version: '3'
+services:
+    db:
+        image: mariadb:10
+        environment:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: db
+    adminer:
+        image: adminer
+        ports:
+            - 8080:8080
+    app:
+        build: .
+        volumes:
+            - '.:/app'
+            - './resources/docker-php-ext-xdebug.ini:/usr/local/etc/php/conf.d/docker-php-ext-xdebug.ini'
+        ports:
+            - 80:80
+        links:
+            - db
+        depends_on:
+            - db
+
+networks:
+    default:
+        driver: bridge
+        ipam:
+            config:
+                - subnet: 10.2.0.0/16
