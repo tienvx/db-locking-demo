@@ -65,11 +65,15 @@ class AccountTransferCommand extends Command
             return;
         }
 
-        $io->note('Transfering money...');
+        $io->note(sprintf('Before transfering %d from %s to %s: %s have %d, %s have %d', $amount, $fromAccount->getName(), $toAccount->getName(), $fromAccount->getName(), $fromAccount->getBalance(), $toAccount->getName(), $toAccount->getBalance()));
+        $io->note(sprintf('Transfering amount %d from %s to %s...', $amount, $fromAccount->getName(), $toAccount->getName()));
+
         sleep(3);
         $fromAccount->setBalance($fromAccount->getBalance() - $amount);
         $toAccount->setBalance($toAccount->getBalance() + $amount);
         $this->entityManager->flush();
+
+        $io->note(sprintf('After transfering %d from %s to %s: %s have %d, %s have %d', $amount, $fromAccount->getName(), $toAccount->getName(), $fromAccount->getName(), $fromAccount->getBalance(), $toAccount->getName(), $toAccount->getBalance()));
 
         $io->success('Money transfered!');
     }
