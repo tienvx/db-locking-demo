@@ -4,10 +4,14 @@ namespace App\Command;
 
 use App\Entity\Account;
 use App\Repository\AccountRepository;
+use Doctrine\DBAL\LockMode;
 use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\ORM\OptimisticLockException;
+use Doctrine\ORM\PessimisticLockException;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
 
@@ -30,6 +34,7 @@ class AccountTransferCommand extends Command
             ->addArgument('from', InputArgument::REQUIRED, 'From account')
             ->addArgument('amount', InputArgument::REQUIRED, 'Amount of money')
             ->addArgument('to', InputArgument::REQUIRED, 'To account')
+            ->addOption('lock', null, InputOption::VALUE_OPTIONAL, 'Lock option')
         ;
     }
 
@@ -68,9 +73,34 @@ class AccountTransferCommand extends Command
         $io->note(sprintf('Before transfering %d from %s to %s: %s have %d, %s have %d', $amount, $fromAccount->getName(), $toAccount->getName(), $fromAccount->getName(), $fromAccount->getBalance(), $toAccount->getName(), $toAccount->getBalance()));
         $io->note(sprintf('Transfering amount %d from %s to %s...', $amount, $fromAccount->getName(), $toAccount->getName()));
 
-        $fromAccount->setBalance($fromAccount->getBalance() - $amount);
-        $toAccount->setBalance($toAccount->getBalance() + $amount);
-        $this->entityManager->flush();
+        $lock = $input->getOption('lock');
+        if ($lock === LockMode::OPTIMISTIC) {
+            try {
+                $this->entityManager->lock($fromAccount, $lock, $fromAccount->getVersion());
+                $this->entityManager->lock($toAccount, $lock, $toAccount->getVersion());
+
+                $fromAccount->setBalance($fromAccount->getBalance() - $amount);
+                $toAccount->setBalance($toAccount->getBalance() + $amount);
+                $this->entityManager->flush();
+            } catch(OptimisticLockException $e) {
+                $io->error('Sorry, but account has been changed before transfering. Please try again!');
+            }
+        } elseif ($lock === LockMode::PESSIMISTIC_WRITE || $lock === LockMode::PESSIMISTIC_READ) {
+            try {
+                $this->entityManager->lock($fromAccount, $lock);
+                $this->entityManager->lock($toAccount, $lock);
+
+                $fromAccount->setBalance($fromAccount->getBalance() - $amount);
+                $toAccount->setBalance($toAccount->getBalance() + $amount);
+                $this->entityManager->flush();
+            } catch(PessimisticLockException $e) {
+                $io->error('Sorry, but account has been changed before transfering. Please try again!');
+            }
+        } else {
+            $fromAccount->setBalance($fromAccount->getBalance() - $amount);
+            $toAccount->setBalance($toAccount->getBalance() + $amount);
+            $this->entityManager->flush();
+        }
 
         $io->note(sprintf('After transfering %d from %s to %s: %s have %d, %s have %d', $amount, $fromAccount->getName(), $toAccount->getName(), $fromAccount->getName(), $fromAccount->getBalance(), $toAccount->getName(), $toAccount->getBalance()));
 

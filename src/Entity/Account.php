@@ -26,6 +26,12 @@ class Account
      */
     private $balance;
 
+    /**
+     * @ORM\Version
+     * @ORM\Column(type="integer")
+     */
+    private $version;
+
     public function getId()
     {
         return $this->id;
@@ -51,6 +57,18 @@ class Account
     public function setBalance(int $balance): self
     {
         $this->balance = $balance;
+
+        return $this;
+    }
+
+    public function getVersion(): ?int
+    {
+        return $this->version;
+    }
+
+    public function setVersion(int $version): self
+    {
+        $this->version = $version;
 
         return $this;
     }
