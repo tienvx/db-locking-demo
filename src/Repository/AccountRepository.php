@@ -31,7 +31,7 @@ class AccountRepository extends ServiceEntityRepository
     /**
      * @return Account[] Returns an array of Account objects
      */
-    public function findByName(string $name): array
+    public function findByNameWithLock(string $name, int $lockMode = null): array
     {
         return $this->createQueryBuilder('a')
             ->andWhere('a.name = :name')
@@ -39,16 +39,18 @@ class AccountRepository extends ServiceEntityRepository
             ->orderBy('a.id', 'ASC')
             ->setMaxResults(10)
             ->getQuery()
+            ->setLockMode($lockMode)
             ->getResult()
         ;
     }
 
-    public function findOneByName(string $name): ?Account
+    public function findOneByNameWithLock(string $name, int $lockMode = null): ?Account
     {
         return $this->createQueryBuilder('a')
             ->andWhere('a.name = :name')
             ->setParameter('name', $name)
             ->getQuery()
+            ->setLockMode($lockMode)
             ->getOneOrNullResult()
         ;
     }

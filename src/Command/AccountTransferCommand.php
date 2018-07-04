@@ -6,7 +6,6 @@ use App\Entity\Account;
 use App\Repository\AccountRepository;
 use Doctrine\DBAL\LockMode;
 use Doctrine\ORM\EntityManagerInterface;
-use Doctrine\ORM\OptimisticLockException;
 use Doctrine\ORM\PessimisticLockException;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
@@ -34,7 +33,7 @@ class AccountTransferCommand extends Command
             ->addArgument('from', InputArgument::REQUIRED, 'From account')
             ->addArgument('amount', InputArgument::REQUIRED, 'Amount of money')
             ->addArgument('to', InputArgument::REQUIRED, 'To account')
-            ->addOption('lock', null, InputOption::VALUE_OPTIONAL, 'Lock option')
+            ->addOption('lock', null, InputOption::VALUE_OPTIONAL, 'Lock option', LockMode::NONE)
         ;
     }
 
@@ -44,66 +43,57 @@ class AccountTransferCommand extends Command
         $from = $input->getArgument('from');
         $amount = $input->getArgument('amount');
         $to = $input->getArgument('to');
-
-        /** @var AccountRepository $repository */
-        $repository = $this->entityManager->getRepository(Account::class);
-
-        $fromAccount = $repository->findOneByName($from);
-        if (!$fromAccount) {
-            $io->error(sprintf('There is no account by name: %s', $from));
-            return;
-        }
-
-        $toAccount = $repository->findOneByName($to);
-        if (!$toAccount) {
-            $io->error(sprintf('There is no account by name: %s', $to));
-            return;
-        }
+        $lock = $input->getOption('lock');
 
         if (!is_numeric($amount)) {
             $io->error(sprintf('Amount is not a number: %d', $amount));
             return;
         }
 
-        if ($fromAccount->getBalance() < (int) $amount) {
-            $io->error(sprintf('There are not enough money to transfer %d from %s: %d', $fromAccount->getBalance(), $fromAccount->getName(), $amount));
+        if (!in_array($lock, [LockMode::NONE, LockMode::PESSIMISTIC_READ, LockMode::PESSIMISTIC_WRITE])) {
+            $io->error(sprintf('Invalid lock: %d', $lock));
             return;
         }
 
-        $io->note(sprintf('Before transfering %d from %s to %s: %s have %d, %s have %d', $amount, $fromAccount->getName(), $toAccount->getName(), $fromAccount->getName(), $fromAccount->getBalance(), $toAccount->getName(), $toAccount->getBalance()));
-        $io->note(sprintf('Transfering amount %d from %s to %s...', $amount, $fromAccount->getName(), $toAccount->getName()));
+        /** @var AccountRepository $repository */
+        $repository = $this->entityManager->getRepository(Account::class);
 
-        $lock = $input->getOption('lock');
-        if ($lock === LockMode::OPTIMISTIC) {
-            try {
-                $this->entityManager->lock($fromAccount, $lock, $fromAccount->getVersion());
-                $this->entityManager->lock($toAccount, $lock, $toAccount->getVersion());
-
-                $fromAccount->setBalance($fromAccount->getBalance() - $amount);
-                $toAccount->setBalance($toAccount->getBalance() + $amount);
-                $this->entityManager->flush();
-            } catch(OptimisticLockException $e) {
-                $io->error('Sorry, but account has been changed before transfering. Please try again!');
+        $this->entityManager->beginTransaction();
+        try {
+            $fromAccount = $repository->findOneByNameWithLock($from, $lock);
+            if (!$fromAccount) {
+                $io->error(sprintf('There is no account by name: %s', $from));
+                return;
             }
-        } elseif ($lock === LockMode::PESSIMISTIC_WRITE || $lock === LockMode::PESSIMISTIC_READ) {
-            try {
-                $this->entityManager->lock($fromAccount, $lock);
-                $this->entityManager->lock($toAccount, $lock);
 
-                $fromAccount->setBalance($fromAccount->getBalance() - $amount);
-                $toAccount->setBalance($toAccount->getBalance() + $amount);
-                $this->entityManager->flush();
-            } catch(PessimisticLockException $e) {
-                $io->error('Sorry, but account has been changed before transfering. Please try again!');
+            $toAccount = $repository->findOneByNameWithLock($to, $lock);
+            if (!$toAccount) {
+                $io->error(sprintf('There is no account by name: %s', $to));
+                return;
             }
-        } else {
+
+            if ($fromAccount->getBalance() < (int) $amount) {
+                $io->error(sprintf('There are not enough money to transfer %d from %s: %d', $fromAccount->getBalance(), $fromAccount->getName(), $amount));
+                return;
+            }
+
+            $io->note(sprintf('Before transfering %d from %s to %s: %s have %d, %s have %d', $amount, $fromAccount->getName(), $toAccount->getName(), $fromAccount->getName(), $fromAccount->getBalance(), $toAccount->getName(), $toAccount->getBalance()));
+            $io->note(sprintf('Transfering amount %d from %s to %s...', $amount, $fromAccount->getName(), $toAccount->getName()));
+
             $fromAccount->setBalance($fromAccount->getBalance() - $amount);
             $toAccount->setBalance($toAccount->getBalance() + $amount);
             $this->entityManager->flush();
+            $this->entityManager->commit();
+        } catch(PessimisticLockException $e) {
+            $this->entityManager->rollback();
+            $io->error('Sorry, but account has been changed before transfering. Please try again!');
+        } catch(\Exception $e) {
+            $this->entityManager->rollback();
+            $io->error('Sorry, but account has been changed before transfering. Please try again!');
+        } finally {
+            $io->note(sprintf('After transfering %d from %s to %s: %s have %d, %s have %d', $amount, $fromAccount->getName(), $toAccount->getName(), $fromAccount->getName(), $fromAccount->getBalance(), $toAccount->getName(), $toAccount->getBalance()));
+
+            $io->success('Money transfered!');
         }
-
-        $io->note(sprintf('After transfering %d from %s to %s: %s have %d, %s have %d', $amount, $fromAccount->getName(), $toAccount->getName(), $fromAccount->getName(), $fromAccount->getBalance(), $toAccount->getName(), $toAccount->getBalance()));
-
-        $io->success('Money transfered!');
     }
 }

@@ -23,7 +23,7 @@ $ docker-compose up
 ```bash
 $ php bin/console account:reset
 $ php bin/console account:transfer Jack 9 Anne
-$ php bin/console account:transfer Jack 99 Anne --lock=optimistic
+$ php bin/console account:transfer Jack 99 Anne --lock=0 # 0 for none, 2 for pessimistic read, 4 for pessimistic write
 $ php bin/console account:transfer-without-lock
 $ php bin/console account:transfer-with-optimistic-lock
 $ php bin/console account:transfer-with-pessimistic-lock

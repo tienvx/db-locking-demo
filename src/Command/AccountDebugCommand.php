@@ -44,7 +44,7 @@ class AccountDebugCommand extends Command
 
     protected function debug(AccountRepository $repository, string $name, SymfonyStyle $io)
     {
-        $account = $repository->findOneByName($name);
+        $account = $repository->findOneByNameWithLock($name);
         $io->note(sprintf('%s have %d', $account->getName(), $account->getBalance()));
     }
 }
