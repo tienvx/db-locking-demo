@@ -6,7 +6,6 @@ use App\Entity\Account;
 use App\Repository\AccountRepository;
 use Doctrine\DBAL\LockMode;
 use Doctrine\ORM\EntityManagerInterface;
-use Doctrine\ORM\PessimisticLockException;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
@@ -84,12 +83,9 @@ class AccountTransferCommand extends Command
             $toAccount->setBalance($toAccount->getBalance() + $amount);
             $this->entityManager->flush();
             $this->entityManager->commit();
-        } catch(PessimisticLockException $e) {
-            $this->entityManager->rollback();
-            $io->error('Sorry, but account has been changed before transfering. Please try again!');
         } catch(\Exception $e) {
             $this->entityManager->rollback();
-            $io->error('Sorry, but account has been changed before transfering. Please try again!');
+            $io->error('Sorry, can not transfer money. Please try again!');
         } finally {
             $io->note(sprintf('After transfering %d from %s to %s: %s have %d, %s have %d', $amount, $fromAccount->getName(), $toAccount->getName(), $fromAccount->getName(), $fromAccount->getBalance(), $toAccount->getName(), $toAccount->getBalance()));
 

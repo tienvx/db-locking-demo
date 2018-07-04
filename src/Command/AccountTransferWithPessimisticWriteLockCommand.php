@@ -7,14 +7,14 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
 
-class AccountTransferWithPessimisticLockCommand extends TransferWithLockCommand
+class AccountTransferWithPessimisticWriteLockCommand extends TransferWithLockCommand
 {
-    protected static $defaultName = 'account:transfer-with-pessimistic-lock';
+    protected static $defaultName = 'account:transfer-with-pessimistic-write-lock';
 
     protected function configure()
     {
         $this
-            ->setDescription('Transfer money at the same time, with pessimistic lock')
+            ->setDescription('Transfer money at the same time, with pessimistic write lock')
         ;
     }
 
@@ -24,6 +24,6 @@ class AccountTransferWithPessimisticLockCommand extends TransferWithLockCommand
         $this->transfer('Frank', 1, 'Anne', LockMode::PESSIMISTIC_WRITE);
 
         $io = new SymfonyStyle($input, $output);
-        $io->success('Finish transfering money with pessimistic lock!');
+        $io->success('Finish transfering money with pessimistic write lock!');
     }
 }
